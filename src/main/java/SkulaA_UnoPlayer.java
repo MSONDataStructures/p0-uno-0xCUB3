@@ -4,18 +4,41 @@ import java.util.Map;
 
 public class SkulaA_UnoPlayer implements UnoPlayer {
 
-    private Map<Color, Integer> playedColorCounts;
-    private Map<Rank, Integer> playedRankCounts;
+    private Map<Color, Integer> remainingColorCounts;
+    private Map<Rank, Integer> remainingRankCounts;
     private Color[] opponentLastCalledColors;
 
     public SkulaA_UnoPlayer() {
-        playedColorCounts = new HashMap<>();
-        playedRankCounts = new HashMap<>();
+        remainingColorCounts = new HashMap<>();
+        remainingRankCounts = new HashMap<>();
         opponentLastCalledColors = new Color[4]; // Assuming max 4 players
+
+        // Initialize card counts (assuming standard Uno deck)
+        for (Color color : Color.values()) {
+            if (color != Color.NONE) {
+                remainingColorCounts.put(color, 19); // 19 cards of each color
+            }
+        }
+        for (Rank rank : Rank.values()) {
+            switch (rank) {
+                case NUMBER:
+                    remainingRankCounts.put(rank, 36); // 36 number cards
+                    break;
+                case SKIP:
+                case REVERSE:
+                case DRAW_TWO:
+                    remainingRankCounts.put(rank, 8); // 8 of each action card
+                    break;
+                case WILD:
+                case WILD_D4:
+                    remainingRankCounts.put(rank, 4); // 4 Wild and 4 Wild Draw 4
+                    break;
+            }
+        }
     }
 
     public int play(List<Card> hand, Card upCard, Color calledColor, GameState state) {
-        updatePlayedCardCounts(state.getPlayedCards());
+        updateRemainingCardCounts(state.getPlayedCards()); // Perfect card counting
         updateOpponentCalledColors(state.getMostRecentColorCalledByUpcomingPlayers());
 
         int bestCardIndex = -1;
@@ -23,7 +46,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
         for (int i = 0; i < hand.size(); i++) {
             Card card = hand.get(i);
-            int cardScore = evaluateCard(card, upCard, calledColor, state);
+            int cardScore = evaluateCard(card, upCard, calledColor, state, hand); // Pass hand to the function
 
             if (cardScore > bestCardScore && card.canPlayOn(upCard, calledColor)) {
                 bestCardIndex = i;
@@ -34,90 +57,128 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
         return bestCardIndex;
     }
 
-    private int evaluateCard(Card card, Card upCard, Color calledColor, GameState state) {
+    private int evaluateCard(Card card, Card upCard, Color calledColor, GameState state, List<Card> hand) {
         int score = 0;
 
-        // 1. Prioritize Wild Draw 4: Play it strategically
+        // 1.  Wild Draw 4 Priority: Strategic and Aggressive
         if (card.getRank() == Rank.WILD_D4) {
-            score += 50; // Base score for Wild Draw 4
-            score += 5 * state.getNumCardsInHandsOfUpcomingPlayers()[0]; // Punish the next player
-            // Consider playing it even if you have other options if the next player is close to winning
+            score += 50; // Base score
+            score += 10 * state.getNumCardsInHandsOfUpcomingPlayers()[0]; // Heavy punishment
             if (state.getNumCardsInHandsOfUpcomingPlayers()[0] <= 2) {
-                score += 100;
+                score += 100; // Play even with other options if next player is close to winning
             }
             return score;
         }
 
-        // 2. Prioritize Action Cards: Disrupt opponents
-        if (card.getRank() == Rank.DRAW_TWO || card.getRank() == Rank.SKIP || card.getRank() == Rank.REVERSE) {
-            score += 20; // Base score for action cards
-            score += 3 * state.getNumCardsInHandsOfUpcomingPlayers()[0]; // Punish the next player
-        }
-
-        // 3. Match Upcard Color:  Good to continue the trend
-        if (card.getColor() == upCard.getColor()) {
-            score += 10;
-        }
-
-        // 4. Match Called Color: Good if a wild was just played
-        if (upCard.getRank() == Rank.WILD || upCard.getRank() == Rank.WILD_D4) {
-            if (card.getColor() == calledColor) {
-                score += 8;
+        // 2. Prioritize Winning:
+        if (hand.size() <= 3) {  // hand.size() is now accessible
+            // If close to winning, focus heavily on matching color and rank
+            if (card.getColor() == upCard.getColor()) {
+                score += 30;
+            }
+            if (card.getRank() == upCard.getRank()) {
+                score += 25;
             }
         }
 
-        // 5. Match Rank (if not number): Continue the action
-        if (card.getRank() == upCard.getRank() && card.getRank() != Rank.NUMBER) {
-            score += 8;
+        // 3. Action Cards: Disrupt and Deplete
+        if (card.getRank() == Rank.DRAW_TWO || card.getRank() == Rank.SKIP || card.getRank() == Rank.REVERSE) {
+            score += 20; // Base score
+            score += 5 * state.getNumCardsInHandsOfUpcomingPlayers()[0]; // Punish the next player
         }
 
-        // 6. Match Number (if both are numbers)
+        // 4. Card Depletion: Get rid of cards quickly
+        if (card.getColor() == upCard.getColor()) {
+            score += 15; // Prioritize matching color
+        }
+        if (card.getRank() == upCard.getRank() && card.getRank() != Rank.NUMBER) {
+            score += 12; // Prioritize matching rank (non-number cards)
+        }
         if (card.getRank() == Rank.NUMBER && upCard.getRank() == Rank.NUMBER &&
                 card.getNumber() == upCard.getNumber()) {
-            score += 5;
+            score += 10; // Prioritize matching number
         }
 
-        // 7. Play Cards You Have Many Of:  Call that color later
-        if (card.getColor() != Color.NONE) {
-            score += playedColorCounts.getOrDefault(card.getColor(), 0);
+        // 5. Called Color After Wild (if applicable)
+        if (upCard.getRank() == Rank.WILD || upCard.getRank() == Rank.WILD_D4) {
+            if (card.getColor() == calledColor) {
+                score += 12; // Match the called color
+            }
         }
 
-        // 8. Avoid Cards Opponents Might Want
+        // 6. Play Cards You Have Many Of (for later Wild calls)
         if (card.getColor() != Color.NONE) {
+            score += remainingColorCounts.getOrDefault(card.getColor(), 0);
+        }
+
+        // 7. Play Cards Opponents Likely Don't Have:
+        if (card.getColor() != Color.NONE) {
+            if (remainingColorCounts.get(card.getColor()) <= 5) { // If few of this color remain
+                score += 15;
+            }
             for (Color opponentColor : opponentLastCalledColors) {
                 if (opponentColor == card.getColor()) {
-                    score -= 5; // Penalize playing a color an opponent might want
+                    score -= 8; // Penalize playing a color an opponent might want
                 }
             }
         }
 
-        // 9. Minimize Point Loss: If close to losing, get rid of high-point cards
-        int totalScore = state.getTotalScoreOfUpcomingPlayers()[state.getTotalScoreOfUpcomingPlayers().length - 1];
-        if (totalScore >= 400) {
-            score -= card.forfeitCost(); // Try to get rid of high-value cards
+        // 8. Minimize Point Loss:  If losing, get rid of high cards
+        if (state.getTotalScoreOfUpcomingPlayers()[state.getTotalScoreOfUpcomingPlayers().length - 1] >= 400) {
+            score -= card.forfeitCost() * 2; // Prioritize point minimization when losing
         }
 
         return score;
     }
 
     public Color callColor(List<Card> hand) {
-        // Call the color you have the most of
+        // 1.  Force Opponent Draws:
+        for (int i = 0; i < opponentLastCalledColors.length - 1; i++) {
+            Color opponentColor = opponentLastCalledColors[i];
+            if (opponentColor != null && remainingColorCounts.get(opponentColor) == 0) {
+                return opponentColor; // Call a color the next opponent is out of
+            }
+        }
+
+        // 2. If no guaranteed force, call the color you have the most of
         return getMostFrequentColor(hand);
     }
 
-    // Helper functions to update card counts and opponent called colors
-    private void updatePlayedCardCounts(List<Card> playedCards) {
-        playedColorCounts.clear();
-        playedRankCounts.clear();
+    // Helper functions
+    private void updateRemainingCardCounts(List<Card> playedCards) {
+        // Reset counts to standard deck values
+        for (Color color : Color.values()) {
+            if (color != Color.NONE) {
+                remainingColorCounts.put(color, 19);
+            }
+        }
+        for (Rank rank : Rank.values()) {
+            switch (rank) {
+                case NUMBER:
+                    remainingRankCounts.put(rank, 36);
+                    break;
+                case SKIP:
+                case REVERSE:
+                case DRAW_TWO:
+                    remainingRankCounts.put(rank, 8);
+                    break;
+                case WILD:
+                case WILD_D4:
+                    remainingRankCounts.put(rank, 4);
+                    break;
+            }
+        }
 
+        // Decrement counts for played cards
         for (Card card : playedCards) {
-            playedColorCounts.put(card.getColor(), playedColorCounts.getOrDefault(card.getColor(), 0) + 1);
-            playedRankCounts.put(card.getRank(), playedRankCounts.getOrDefault(card.getRank(), 0) + 1);
+            if (card.getColor() != Color.NONE) {
+                remainingColorCounts.put(card.getColor(), remainingColorCounts.get(card.getColor()) - 1);
+            }
+            remainingRankCounts.put(card.getRank(), remainingRankCounts.get(card.getRank()) - 1);
         }
     }
 
     private void updateOpponentCalledColors(Color[] recentCalledColors) {
-        // Handle potential null values in recentCalledColors
         if (recentCalledColors != null) {
             opponentLastCalledColors = recentCalledColors;
         }
@@ -125,15 +186,11 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
     private Color getMostFrequentColor(List<Card> hand) {
         Map<Color, Integer> colorCounts = new HashMap<>();
-
-        // Count the number of cards of each color in the hand
         for (Card card : hand) {
             if (card.getColor() != Color.NONE) {
                 colorCounts.put(card.getColor(), colorCounts.getOrDefault(card.getColor(), 0) + 1);
             }
         }
-
-        // Find the color with the most cards
         int maxCount = 0;
         Color mostFrequentColor = Color.RED; // Default
         for (Color color : colorCounts.keySet()) {
@@ -142,7 +199,6 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
                 maxCount = colorCounts.get(color);
             }
         }
-
         return mostFrequentColor;
     }
 }
