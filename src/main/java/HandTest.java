@@ -4,7 +4,7 @@ public class HandTest
 {
     public static void main(String[] args)
     {
-        UnoPlayer jup = new Bad_UnoPlayer();
+        UnoPlayer jup = new SkulaA_UnoPlayer();
 
         List<Card> hand = new java.util.ArrayList<Card>();
         hand.add(new Card(UnoPlayer.Color.RED, UnoPlayer.Rank.NUMBER, 4));

@@ -3,9 +3,9 @@ import java.util.*;
 
 public class TestCaseProcessor
 {
-    public static String player = "SmithJ";
+    public static String player = "SkulaA";
     public String classname = player + "_UnoPlayer";
-    public String filename = "testCases.txt";
+    public String filename = "/Users/alexanderskula/Documents/p0-uno-0xCUB3/src/main/java/testCases.txt";
 
     private UnoPlayer thePlayer;
 
@@ -64,7 +64,7 @@ public class TestCaseProcessor
                 new Scanner(validPlaysLine).useDelimiter(",");
             while (validPlaysScanner.hasNextInt())
             {
-                validPlays.add(new Integer(validPlaysScanner.nextInt()));
+                validPlays.add(Integer.valueOf(validPlaysScanner.nextInt()));
             }
             
             testHand(hand,upCard,calledColor,validPlays);

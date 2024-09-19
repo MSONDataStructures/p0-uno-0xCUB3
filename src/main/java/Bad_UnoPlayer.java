@@ -2,7 +2,7 @@ import java.util.List;
 
 public class Bad_UnoPlayer implements UnoPlayer {
     /**
-     * play - This method is called when it's your turn and you need to
+     * play - This method is called when it's your turn, and you need to
      * choose what card to play.
      *
      * The hand parameter tells you what's in your hand. You can call

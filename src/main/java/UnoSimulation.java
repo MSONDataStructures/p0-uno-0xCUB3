@@ -35,7 +35,7 @@ public class UnoSimulation
      * "fsmith_UnoPlayer") against Jane (whose classname was
      * "jdoe_Unoplayer") against, Billy,... etc.
      */
-    public static final String PLAYER_FILENAME = "players.txt";
+    public static final String PLAYER_FILENAME = "/Users/alexanderskula/Documents/p0-uno-0xCUB3/src/main/java/players.txt";
 
     /**
      * The names ("Joe") and classes ("jsmith_UnoPlayer") of competing
