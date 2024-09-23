@@ -62,6 +62,8 @@ public class Hand
      * @return The Card object to be played (which has been removed from
      * this Hand as a side effect), or null if no such Card can be played.
      */
+
+    // Edited by Skula
     Card play(Game game)
     {
         int playedCard;

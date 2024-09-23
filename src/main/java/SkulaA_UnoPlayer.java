@@ -4,19 +4,19 @@ import java.util.Map;
 
 public class SkulaA_UnoPlayer implements UnoPlayer {
 
-    private Map<Color, Integer> remainingColorCounts;
+    private Map<Color, Integer> colorCounts;
     private Map<Rank, Integer> remainingRankCounts;
     private Color[] opponentLastCalledColors;
 
     public SkulaA_UnoPlayer() {
-        remainingColorCounts = new HashMap<>();
+        colorCounts = new HashMap<>();
         remainingRankCounts = new HashMap<>();
         opponentLastCalledColors = new Color[4]; // Assuming max 4 players
 
         // Initialize card counts (assuming standard Uno deck)
         for (Color color : Color.values()) {
             if (color != Color.NONE) {
-                remainingColorCounts.put(color, 19); // 19 cards of each color
+                colorCounts.put(color, 19); // 19 cards of each color
             }
         }
         for (Rank rank : Rank.values()) {
@@ -38,7 +38,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     }
 
     public int play(List<Card> hand, Card upCard, Color calledColor, GameState state) {
-        updateRemainingCardCounts(state.getPlayedCards()); // Perfect card counting
+        updateRemainingCardCounts(state.getPlayedCards());
         updateOpponentCalledColors(state.getMostRecentColorCalledByUpcomingPlayers());
 
         int bestCardIndex = -1;
@@ -46,7 +46,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
         for (int i = 0; i < hand.size(); i++) {
             Card card = hand.get(i);
-            int cardScore = evaluateCard(card, upCard, calledColor, state, hand); // Pass hand to the function
+            int cardScore = evaluateCard(card, upCard, calledColor, state, hand);
 
             if (cardScore > bestCardScore && card.canPlayOn(upCard, calledColor)) {
                 bestCardIndex = i;
@@ -67,11 +67,11 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
             if (state.getNumCardsInHandsOfUpcomingPlayers()[0] <= 2) {
                 score += 100; // Play even with other options if next player is close to winning
             }
-            return score;
+            return score; // High priority, no need to evaluate further
         }
 
         // 2. Prioritize Winning:
-        if (hand.size() <= 3) {  // hand.size() is now accessible
+        if (hand.size() <= 3) {
             // If close to winning, focus heavily on matching color and rank
             if (card.getColor() == upCard.getColor()) {
                 score += 30;
@@ -108,12 +108,12 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
         // 6. Play Cards You Have Many Of (for later Wild calls)
         if (card.getColor() != Color.NONE) {
-            score += remainingColorCounts.getOrDefault(card.getColor(), 0);
+            score += colorCounts.getOrDefault(card.getColor(), 0);
         }
 
         // 7. Play Cards Opponents Likely Don't Have:
         if (card.getColor() != Color.NONE) {
-            if (remainingColorCounts.get(card.getColor()) <= 5) { // If few of this color remain
+            if (colorCounts.get(card.getColor()) <= 5) { // If few of this color remain
                 score += 15;
             }
             for (Color opponentColor : opponentLastCalledColors) {
@@ -135,7 +135,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
         // 1.  Force Opponent Draws:
         for (int i = 0; i < opponentLastCalledColors.length - 1; i++) {
             Color opponentColor = opponentLastCalledColors[i];
-            if (opponentColor != null && remainingColorCounts.get(opponentColor) == 0) {
+            if (opponentColor != null && colorCounts.get(opponentColor) == 0) {
                 return opponentColor; // Call a color the next opponent is out of
             }
         }
@@ -149,7 +149,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
         // Reset counts to standard deck values
         for (Color color : Color.values()) {
             if (color != Color.NONE) {
-                remainingColorCounts.put(color, 19);
+                colorCounts.put(color, 19);
             }
         }
         for (Rank rank : Rank.values()) {
@@ -172,7 +172,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
         // Decrement counts for played cards
         for (Card card : playedCards) {
             if (card.getColor() != Color.NONE) {
-                remainingColorCounts.put(card.getColor(), remainingColorCounts.get(card.getColor()) - 1);
+                colorCounts.put(card.getColor(), colorCounts.get(card.getColor()) - 1);
             }
             remainingRankCounts.put(card.getRank(), remainingRankCounts.get(card.getRank()) - 1);
         }
@@ -192,7 +192,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
             }
         }
         int maxCount = 0;
-        Color mostFrequentColor = Color.RED; // Default
+        Color mostFrequentColor = Color.RED;
         for (Color color : colorCounts.keySet()) {
             if (colorCounts.get(color) > maxCount) {
                 mostFrequentColor = color;
