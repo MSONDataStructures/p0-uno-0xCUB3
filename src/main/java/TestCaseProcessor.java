@@ -5,7 +5,7 @@ public class TestCaseProcessor
 {
     public static String player = "SkulaA";
     public String classname = player + "_UnoPlayer";
-    public String filename = "/Users/alexanderskula/Documents/p0-uno-0xCUB3/lib/testCases.txt";
+    public String filename = "lib/testCases.txt";
 
     private UnoPlayer thePlayer;
 

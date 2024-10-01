@@ -5,7 +5,7 @@ import java.util.Scanner;
 
 public class WinRateCalculator {
 
-    public static final String PLAYER_FILENAME = "/Users/alexanderskula/Documents/p0-uno-0xCUB3/lib/players.txt";
+    public static final String PLAYER_FILENAME = "lib/players.txt";
 
     // Total # of games = NUM_SIMULATIONS * GAMES_PER_SIMULATION
     public static final int NUM_SIMULATIONS = 100;
