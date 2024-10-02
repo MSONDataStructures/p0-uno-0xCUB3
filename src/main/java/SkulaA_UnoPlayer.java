@@ -7,9 +7,9 @@ import java.util.Map;
  * An implementation of the UnoPlayer interface for the Uno game. This player
  * employs a strategic approach to maximize its chances of winning. It prioritizes
  * playing cards to deplete its hand quickly, especially when close to winning.
- * It considers various factors such as the current upcard, the called color (if any),
- * the number of cards in opponents' hands, and the overall game state to make
- * informed decisions.
+ * It considers various factors such as the current upcard (card face-up on the table),
+ * the called color (if any), the number of cards in opponents' hands, and the
+ * overall game state to make informed decisions.
  * </p>
  * @since 1.0
  */
@@ -57,8 +57,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
      *
      * @param hand        The list of cards in the player's hand.
      * @param upCard      The current upcard on the game pile.
-     * @param calledColor The color called by the previous player if the upcard was a
-     *                   Wild card.
+     * @param calledColor The color called by the previous player if the upcard was Wild
      * @param state       The current game state.
      * @return The index of the card to play, or -1 if no card can be played.
      */
@@ -164,7 +163,6 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
     /**
      * Determines and returns the color to call after playing a Wild card.
-     * This implementation chooses the most frequent color in the player's hand.
      *
      * @param hand The player's current hand.
      * @return The chosen color to call.
