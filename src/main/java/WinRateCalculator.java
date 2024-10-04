@@ -12,17 +12,23 @@ public class WinRateCalculator {
     public static final int GAMES_PER_SIMULATION = 20;
 
     public static void main(String[] args) {
-        int alexanderWins = 0;
 
         try {
+            // Load player data and get the first player's name
+            ArrayList<String> playerNames = new ArrayList<>();
+            ArrayList<String> playerClasses = new ArrayList<>();
+            loadPlayerData(playerNames, playerClasses);
+            String firstPlayerName = playerNames.get(0);
+
+            int firstPlayerWins = 0;
             for (int i = 0; i < NUM_SIMULATIONS; i++) {
                 System.out.println("Starting Uno Simulation #" + (i + 1));
-                alexanderWins += runSimulation();
+                firstPlayerWins += runSimulation(playerNames, playerClasses);
             }
 
-            double winPercentage = (double) alexanderWins / (NUM_SIMULATIONS * GAMES_PER_SIMULATION) * 100;
+            double winPercentage = (double) firstPlayerWins / (NUM_SIMULATIONS * GAMES_PER_SIMULATION) * 100;
             System.out.println("\n--------------------");
-            System.out.println("Overall Win Percentage for Alexander: " + winPercentage + "%");
+            System.out.println("Overall Win Percentage for " + firstPlayerName + ": " + winPercentage + "%");
             System.out.println("--------------------\n");
 
         } catch (Exception e) {
@@ -30,26 +36,22 @@ public class WinRateCalculator {
         }
     }
 
-    private static int runSimulation() throws Exception {
-        ArrayList<String> playerNames = new ArrayList<String>();
-        ArrayList<String> playerClasses = new ArrayList<String>();
-        loadPlayerData(playerNames, playerClasses);
-
-        int alexanderWinsInSimulation = 0;
+    private static int runSimulation(ArrayList<String> playerNames, ArrayList<String> playerClasses) throws Exception {
+        int firstPlayerWinsInSimulation = 0;
         Scoreboard s = new Scoreboard(playerNames.toArray(new String[0]));
 
         for (int i = 0; i < GAMES_PER_SIMULATION; i++) {
             Game g = new Game(s, playerClasses);
             g.play();
 
-            // Check if Alexander won the game
-            if (s.getPlayerList()[s.getWinner()].equals("Alexander")) {
-                alexanderWinsInSimulation++;
+            // Check if the first player won the game
+            if (s.getWinner() == 0) {
+                firstPlayerWinsInSimulation++;
             }
         }
 
-        System.out.println("Alexander wins in this simulation: " + alexanderWinsInSimulation);
-        return alexanderWinsInSimulation;
+        System.out.println(playerNames.get(0) + " wins in this simulation: " + firstPlayerWinsInSimulation);
+        return firstPlayerWinsInSimulation;
     }
 
     private static void loadPlayerData(ArrayList<String> playerNames, ArrayList<String> playerClasses)
