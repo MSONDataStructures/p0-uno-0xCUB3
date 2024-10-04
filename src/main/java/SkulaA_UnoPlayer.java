@@ -1,16 +1,15 @@
-import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>
  * An implementation of the UnoPlayer interface for the Uno game. This player
- * employs a strategic approach to maximize its chances of winning. It prioritizes
- * playing cards to deplete its hand quickly, especially when close to winning.
- * It considers various factors such as the current upcard (card face-up on the table),
- * the called color (if any), the number of cards in opponents' hands, and the
- * overall game state to make informed decisions.
+ * employs a strategic approach to maximize its chances of winning, incorporating
+ * opponent modeling, strategic card usage, and defensive play to perform well
+ * even in multi-player scenarios. It tracks opponent card choices, including
+ * their preference for colors and frequency of action card usage, to make more
+ * informed decisions.
  * </p>
+ *
  * @since 1.0
  */
 public class SkulaA_UnoPlayer implements UnoPlayer {
@@ -18,34 +17,38 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     private Map<Color, Integer> colorCounts;
     private Map<Rank, Integer> remainingRankCounts;
     private Color[] opponentLastCalledColors;
+    private int[] opponentActionCardFrequency;
 
     /**
      * Constructs a new SkulaA_UnoPlayer with initialized game state trackers.
+     * It sets up data structures to track card counts, opponent color calls,
+     * and opponent action card usage frequency.
      */
     public SkulaA_UnoPlayer() {
         colorCounts = new HashMap<>();
         remainingRankCounts = new HashMap<>();
         opponentLastCalledColors = new Color[4]; // Assuming max 4 players
+        opponentActionCardFrequency = new int[4];
 
-        // Initialize card counts (assuming standard Uno deck)
+        // Initialize card counts for a standard Uno deck
         for (Color color : Color.values()) {
             if (color != Color.NONE) {
-                colorCounts.put(color, 19); // 19 cards of each color
+                colorCounts.put(color, 19);
             }
         }
         for (Rank rank : Rank.values()) {
             switch (rank) {
                 case NUMBER:
-                    remainingRankCounts.put(rank, 36); // 36 number cards
+                    remainingRankCounts.put(rank, 36);
                     break;
                 case SKIP:
                 case REVERSE:
                 case DRAW_TWO:
-                    remainingRankCounts.put(rank, 8); // 8 of each action card
+                    remainingRankCounts.put(rank, 8);
                     break;
                 case WILD:
                 case WILD_D4:
-                    remainingRankCounts.put(rank, 4); // 4 Wild and 4 Wild Draw 4
+                    remainingRankCounts.put(rank, 4);
                     break;
             }
         }
@@ -53,17 +56,19 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
 
     /**
      * Determines and returns the index of the most strategically valuable card to
-     * play from the hand.
+     * play from the hand. The decision considers opponent behavior, card availability,
+     * and the current game state.
      *
      * @param hand        The list of cards in the player's hand.
      * @param upCard      The current upcard on the game pile.
-     * @param calledColor The color called by the previous player if the upcard was Wild
+     * @param calledColor The color called by the previous player if the upcard was Wild.
      * @param state       The current game state.
      * @return The index of the card to play, or -1 if no card can be played.
      */
     public int play(List<Card> hand, Card upCard, Color calledColor, GameState state) {
         updateRemainingCardCounts(state.getPlayedCards());
         updateOpponentCalledColors(state.getMostRecentColorCalledByUpcomingPlayers());
+        updateOpponentActionCardFrequency(state);
 
         int bestCardIndex = -1;
         int bestCardScore = Integer.MIN_VALUE;
@@ -83,8 +88,10 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     }
 
     /**
-     * Evaluates a card's strategic value based on the current game state.
-     * A higher score indicates a more valuable card to play.
+     * Evaluates a card's strategic value based on the current game state and
+     * opponent behavior. A higher score indicates a more valuable card to play.
+     * The evaluation considers factors like card matching, action card potential,
+     * opponent card counts, and potential point loss.
      *
      * @param card        The card being evaluated.
      * @param upCard      The current upcard.
@@ -96,31 +103,36 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     private int evaluateCard(Card card, Card upCard, Color calledColor, GameState state, List<Card> hand) {
         int score = 0;
 
-        // Prioritize playing Wild Draw 4 strategically
+        // Wild Draw 4 Strategy: Prioritize using it against opponents with many cards
+        // or those who frequently use action cards
         if (card.getRank() == Rank.WILD_D4) {
-            score += 50 + 10 * state.getNumCardsInHandsOfUpcomingPlayers()[0];
+            score += 50;
+            for (int i = 0; i < state.getNumCardsInHandsOfUpcomingPlayers().length; i++) {
+                score += 10 * state.getNumCardsInHandsOfUpcomingPlayers()[i];
+                score += 20 * opponentActionCardFrequency[i];
+            }
             if (state.getNumCardsInHandsOfUpcomingPlayers()[0] <= 2) {
                 score += 100;
             }
-            return score;
+            return score; // Prioritize WILD_D4 in these situations
         }
 
-        // Prioritize winning
+        // Prioritize winning, but be cautious about emptying hand too early
+        // when there are multiple opponents
         if (hand.size() <= 3) {
-            if (card.getColor() == upCard.getColor()) {
-                score += 30;
-            }
-            if (card.getRank() == upCard.getRank()) {
-                score += 25;
-            }
+            score += 30;
+            score -= 5 * (state.getNumCardsInHandsOfUpcomingPlayers().length - 1);
         }
 
-        // Action cards
+        // Action Card Strategy: More valuable when opponents have many cards
         if (card.getRank() == Rank.DRAW_TWO || card.getRank() == Rank.SKIP || card.getRank() == Rank.REVERSE) {
-            score += 20 + 5 * state.getNumCardsInHandsOfUpcomingPlayers()[0];
+            score += 20;
+            for (int cards : state.getNumCardsInHandsOfUpcomingPlayers()) {
+                score += 5 * cards;
+            }
         }
 
-        // Card Depletion
+        // Card Depletion: Gain points for playing matching cards
         if (card.getColor() == upCard.getColor()) {
             score += 15;
         }
@@ -131,29 +143,29 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
             score += 10;
         }
 
-        // Called color after wild
+        // Called Color Strategy: Align with the called color after a Wild card
         if (upCard.getRank() == Rank.WILD || upCard.getRank() == Rank.WILD_D4) {
             if (card.getColor() == calledColor) {
                 score += 12;
             }
         }
 
-        // Play cards you have many of
+        // Card Advantage: Play cards of a color you have many of
         if (card.getColor() != Color.NONE) {
             score += colorCounts.getOrDefault(card.getColor(), 0);
         }
 
-        // Play cards opponents likely don't have
+        // Opponent Card Deduction: Play cards opponents likely don't have
         if (card.getColor() != Color.NONE && colorCounts.get(card.getColor()) <= 5) {
             score += 15;
             for (Color opponentColor : opponentLastCalledColors) {
                 if (opponentColor == card.getColor()) {
-                    score -= 8;
+                    score -= 8; // Less valuable if an opponent called this color recently
                 }
             }
         }
 
-        // Minimize point loss
+        // Minimize Point Loss: Be more cautious about point loss in the late game
         if (state.getTotalScoreOfUpcomingPlayers()[state.getTotalScoreOfUpcomingPlayers().length - 1] >= 400) {
             score -= card.forfeitCost() * 2;
         }
@@ -162,7 +174,8 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     }
 
     /**
-     * Determines and returns the color to call after playing a Wild card.
+     * Determines the color to call after playing a Wild card.
+     * It chooses the most frequent color in the player's hand.
      *
      * @param hand The player's current hand.
      * @return The chosen color to call.
@@ -175,7 +188,7 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
             }
         }
 
-        Color mostFrequentColor = Color.RED; // Default to RED
+        Color mostFrequentColor = Color.RED; // Default
         int maxCount = 0;
         for (Map.Entry<Color, Integer> entry : handColorCounts.entrySet()) {
             if (entry.getValue() > maxCount) {
@@ -188,8 +201,8 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     }
 
     /**
-     * Updates internal trackers for the remaining card counts based on the played
-     * cards.
+     * Updates the internal trackers for the remaining card counts based on the played
+     * cards. This helps the AI deduce which cards are less likely to be in opponents' hands.
      *
      * @param playedCards The list of cards played so far in the game.
      */
@@ -203,13 +216,32 @@ public class SkulaA_UnoPlayer implements UnoPlayer {
     }
 
     /**
-     * Updates the tracker for colors called by opponents based on recent calls.
+     * Updates the tracker for colors called by opponents, which is used to infer
+     * potential card holdings and play patterns.
      *
      * @param recentCalledColors An array of colors recently called by opponents.
      */
     private void updateOpponentCalledColors(Color[] recentCalledColors) {
         if (recentCalledColors != null) {
             opponentLastCalledColors = recentCalledColors;
+        }
+    }
+
+    /**
+     * Updates the tracker for the frequency of action card usage by opponents. This
+     * information is used to assess risk levels and make strategic decisions,
+     * particularly regarding the use of Wild Draw 4 cards.
+     *
+     * @param state The current game state.
+     */
+    private void updateOpponentActionCardFrequency(GameState state) {
+        // Basic implementation: Increment frequency when an opponent calls a color,
+        // implying an action card was played
+        int numPlayers = state.getNumCardsInHandsOfUpcomingPlayers().length;
+        for (int i = 1; i < numPlayers; i++) { // Skip current player
+            if (state.getMostRecentColorCalledByUpcomingPlayers()[i] != Color.NONE) {
+                opponentActionCardFrequency[i]++;
+            }
         }
     }
 }
